@@ -1,17 +1,86 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="./css/game.css">
   <title>Document</title>
 </head>
+
 <body>
-  
-<div id="game-root">
-  <canvas id="stars"></canvas>
-  <div class="content" id="main-content"></div>
-</div>
-<script src="Game.js"></script>
+
+  <div id="game-root">
+    <canvas id="stars"></canvas>
+    <div class="content" id="main-content"></div>
+  </div>
+  <div class="diogram">
+
+    <h2 class="sr-only">Lucky Doors simulation: 10,000 rounds of probability analysis showing outcome distributions,
+      expected values, and survival statistics.</h2>
+
+    <div style="padding: 1rem 0;">
+
+      <div id="controls" style="display:flex; align-items:center; gap:16px; margin-bottom:1.5rem; flex-wrap:wrap;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <label style="font-size:13px; color:var(--color-text-secondary);">Starting HP</label>
+          <input type="range" min="50" max="200" value="100" step="10" id="startHp" style="width:110px;">
+          <span id="startHpOut" style="font-size:13px; font-weight:500; min-width:36px;">100</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <label style="font-size:13px; color:var(--color-text-secondary);">Doors (round 1)</label>
+          <input type="range" min="2" max="5" value="2" step="1" id="numDoors" style="width:90px;">
+          <span id="numDoorsOut" style="font-size:13px; font-weight:500; min-width:16px;">2</span>
+        </div>
+        <button onclick="runSim()" style="font-size:13px; padding:6px 16px;">Re-run ↗</button>
+      </div>
+
+      <div id="metric-cards"
+        style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px,1fr)); gap:12px; margin-bottom:1.5rem;">
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:1.5rem;">
+        <div>
+          <div style="font-size:12px; color:var(--color-text-secondary); margin-bottom:8px;">Outcome frequency (all
+            picks)</div>
+          <div style="position:relative; height:220px;"><canvas id="outChart" role="img"
+              aria-label="Bar chart of outcome frequencies across 10000 simulated rounds.">Treasure, Enemy, Trap,
+              Ability, Rare Item counts.</canvas></div>
+        </div>
+        <div>
+          <div style="font-size:12px; color:var(--color-text-secondary); margin-bottom:8px;">Gold accumulated
+            distribution</div>
+          <div style="position:relative; height:220px;"><canvas id="goldChart" role="img"
+              aria-label="Histogram of total gold accumulated when runs end.">Distribution of gold earned per
+              run.</canvas></div>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:1.5rem;">
+        <div>
+          <div style="font-size:12px; color:var(--color-text-secondary); margin-bottom:8px;">Rounds survived
+            distribution</div>
+          <div style="position:relative; height:200px;"><canvas id="roundChart" role="img"
+              aria-label="Histogram showing how many rounds players typically survive.">Rounds survived per
+              run.</canvas></div>
+        </div>
+        <div>
+          <div style="font-size:12px; color:var(--color-text-secondary); margin-bottom:8px;">Expected value per door
+            pick</div>
+          <div style="position:relative; height:200px;"><canvas id="evChart" role="img"
+              aria-label="Bar chart of expected HP and gold change per outcome.">EV breakdown by outcome type.</canvas>
+          </div>
+        </div>
+      </div>
+
+      <div id="ev-table"
+        style="font-size:13px; background:var(--color-background-secondary); border-radius:var(--border-radius-md); padding:1rem;">
+      </div>
+
+    </div>
+  </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <script src="Game.js"></script>
 </body>
+
 </html>

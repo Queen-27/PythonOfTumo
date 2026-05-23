@@ -4,7 +4,7 @@ const OUTCOMES = [
   { id:'trap',     label:'Trap',     icon:'☠️', effect:'-25 HP',   hpDelta:-25, goldDelta:0, tag:'danger' },
   { id:'ability',  label:'Special Ability', icon:'✨', effect:'+10 HP, +5 Gold', hpDelta:10, goldDelta:5, tag:'special' },
   { id:'rareitem', label:'Rare Item',icon:'👑', effect:'+40 Gold, +5 HP', hpDelta:5, goldDelta:40, tag:'good' },
-];
+]
 
 function randProbs(n) {
   let r = Array.from({length:n}, ()=> Math.random()+0.3);
@@ -167,6 +167,235 @@ function setupStars() {
     ctx.fill();
   }
 }
+
+function randProbs(n) {
+  let r = Array.from({length:n}, ()=> Math.random()+0.3);
+  let sum = r.reduce((a,b)=>a+b,0);
+  r = r.map(x=>x/sum);
+  let t=0, out=[];
+  for(let i=0;i<n-1;i++){ let p=Math.round(r[i]*100); t+=p; out.push(p); }
+  out.push(100-t);
+  return out;
+}
+
+function weightedPick(probs) {
+  let roll=Math.random()*100, cum=0;
+  for(let i=0;i<probs.length;i++){ cum+=probs[i]; if(roll<cum) return i; }
+  return probs.length-1;
+}
+
+function genDoor() {
+  let picks = OUTCOMES.slice().sort(()=>Math.random()-0.5).slice(0, 3+Math.floor(Math.random()*2));
+  let probs = randProbs(picks.length);
+  return { outcomes:picks, probs };
+}
+
+function oneRun(startHp, firstRoundDoors) {
+  let hp=startHp, gold=0, round=1;
+  while(hp>0 && round<=200) {
+    let numDoors = round === 1 ? firstRoundDoors : 2 + Math.min(round-1,2);
+    let doorIdx = Math.floor(Math.random()*numDoors);
+    let door = genDoor();
+    let oi = weightedPick(door.probs);
+    let o = door.outcomes[oi];
+    hp = Math.max(0, Math.min(startHp, hp + o.hpDelta));
+    gold += o.goldDelta;
+    if(hp <= 0) break;
+    round++;
+  }
+  return { rounds: round, gold, survived: round>200 };
+}
+
+function computeAnalyticalEV() {
+  const N=50000;
+  let totHp=0, totGold=0, counts={};
+  OUTCOMES.forEach(o=>counts[o.id]=0);
+  for(let i=0;i<N;i++){
+    let door = genDoor();
+    let oi = weightedPick(door.probs);
+    let o = door.outcomes[oi];
+    totHp += o.hpDelta;
+    totGold += o.goldDelta;
+    counts[o.id]++;
+  }
+  return { evHp: totHp/N, evGold: totGold/N, counts, N };
+}
+
+let charts = {};
+function destroyChart(id){ if(charts[id]){ charts[id].destroy(); delete charts[id]; } }
+
+function runSim() {
+  const startHp = +document.getElementById('startHp').value;
+  const firstRoundDoors = +document.getElementById('numDoors').value;
+  const RUNS = 10000;
+
+  const results = [];
+  for(let i=0;i<RUNS;i++) results.push(oneRun(startHp, firstRoundDoors));
+
+  const roundsList = results.map(r=>r.rounds);
+  const goldList   = results.map(r=>r.gold);
+  const survived   = results.filter(r=>r.survived).length;
+  const avgRounds  = roundsList.reduce((a,b)=>a+b,0)/RUNS;
+  const avgGold    = goldList.reduce((a,b)=>a+b,0)/RUNS;
+  const maxRounds  = Math.max(...roundsList);
+  const maxGold    = Math.max(...goldList);
+
+  document.getElementById('metric-cards').innerHTML = [
+    ['Avg rounds survived', avgRounds.toFixed(1)],
+    ['Avg gold earned', Math.round(avgGold)+'g'],
+    ['Max rounds', maxRounds],
+    ['Max gold', maxGold+'g'],
+    ['Survived 200', ((survived/RUNS)*100).toFixed(1)+'%'],
+  ].map(([l,v])=>`
+    <div style="background:var(--color-background-secondary); border-radius:var(--border-radius-md); padding:1rem; text-align:center;">
+      <div style="font-size:12px; color:var(--color-text-secondary); margin-bottom:6px;">${l}</div>
+      <div style="font-size:22px; font-weight:500;">${v}</div>
+    </div>`).join('');
+
+  const ev = computeAnalyticalEV();
+
+  const COLORS = {
+    treasure:'#3B6D11', enemy:'#A32D2D', trap:'#851F1F',
+    ability:'#534AB7', rareitem:'#185FA5'
+  };
+  const outLabels = OUTCOMES.map(o=>o.label);
+  const outCounts = OUTCOMES.map(o=>ev.counts[o.id]);
+  const outColors = OUTCOMES.map(o=>COLORS[o.id]);
+
+  destroyChart('outChart');
+  charts['outChart'] = new Chart(document.getElementById('outChart'), {
+    type:'bar',
+    data:{ labels:outLabels, datasets:[{
+      label:'Picks', data:outCounts, backgroundColor:outColors,
+      borderWidth:0
+    }]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{
+        x:{ ticks:{font:{size:11}, autoSkip:false, maxRotation:30} },
+        y:{ ticks:{font:{size:11}}, grid:{color:'rgba(128,128,128,0.1)'} }
+      }
+    }
+  });
+
+  function histogram(arr, bins) {
+    let mn=Math.min(...arr), mx=Math.max(...arr);
+    let w=(mx-mn)/bins;
+    let edges=Array.from({length:bins},(_,i)=>mn+i*w);
+    let counts=new Array(bins).fill(0);
+    arr.forEach(v=>{ let b=Math.min(bins-1, Math.floor((v-mn)/w)); counts[b]++; });
+    return { edges, counts, w };
+  }
+
+  const gh = histogram(goldList, 20);
+  destroyChart('goldChart');
+  charts['goldChart'] = new Chart(document.getElementById('goldChart'), {
+    type:'bar',
+    data:{ labels:gh.edges.map(e=>Math.round(e)), datasets:[{
+      label:'Runs', data:gh.counts, backgroundColor:'#3266ad', borderWidth:0
+    }]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{
+        x:{ ticks:{font:{size:10}, maxTicksLimit:8, autoSkip:true}, title:{display:true, text:'Gold', font:{size:11}} },
+        y:{ ticks:{font:{size:11}}, grid:{color:'rgba(128,128,128,0.1)'} }
+      }
+    }
+  });
+
+  const rh = histogram(roundsList, Math.min(maxRounds, 30));
+  destroyChart('roundChart');
+  charts['roundChart'] = new Chart(document.getElementById('roundChart'), {
+    type:'bar',
+    data:{ labels:rh.edges.map(e=>Math.round(e)), datasets:[{
+      label:'Runs', data:rh.counts, backgroundColor:'#534AB7', borderWidth:0
+    }]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{
+        x:{ ticks:{font:{size:10}, maxTicksLimit:8, autoSkip:true}, title:{display:true, text:'Rounds', font:{size:11}} },
+        y:{ ticks:{font:{size:11}}, grid:{color:'rgba(128,128,128,0.1)'} }
+      }
+    }
+  });
+
+  destroyChart('evChart');
+  charts['evChart'] = new Chart(document.getElementById('evChart'), {
+    type:'bar',
+    data:{ labels:OUTCOMES.map(o=>o.label), datasets:[
+      { label:'HP EV', data:OUTCOMES.map(o=>o.hpDelta), backgroundColor:'#3ca870', borderWidth:0 },
+      { label:'Gold EV', data:OUTCOMES.map(o=>o.goldDelta), backgroundColor:'#c9a84c', borderWidth:0 }
+    ]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{
+        x:{ ticks:{font:{size:10}, autoSkip:false, maxRotation:30} },
+        y:{ ticks:{font:{size:11}}, grid:{color:'rgba(128,128,128,0.1)'} }
+      }
+    }
+  });
+
+  const hpEV = OUTCOMES.reduce((sum,o)=>{
+    let share = ev.counts[o.id]/ev.N;
+    return sum + o.hpDelta * share;
+  },0);
+  const goldEV = OUTCOMES.reduce((sum,o)=>{
+    let share = ev.counts[o.id]/ev.N;
+    return sum + o.goldDelta * share;
+  },0);
+
+  document.getElementById('ev-table').innerHTML = `
+    <div style="font-size:12px; color:var(--color-text-secondary); margin-bottom:10px;">Expected value per door pick (analytical, 50k samples)</div>
+    <div style="display:flex; gap:24px; flex-wrap:wrap; margin-bottom:12px;">
+      <span style="font-size:13px;">HP per pick: <strong style="color:${hpEV>=0?'#3ca870':'#c04040'}">${hpEV>=0?'+':''}${hpEV.toFixed(2)}</strong></span>
+      <span style="font-size:13px;">Gold per pick: <strong style="color:#c9a84c">+${goldEV.toFixed(2)}g</strong></span>
+    </div>
+    <table style="width:100%; font-size:12px; border-collapse:collapse;">
+      <tr style="color:var(--color-text-secondary); border-bottom:0.5px solid var(--color-border-tertiary);">
+        <td style="padding:4px 8px 4px 0;">Outcome</td>
+        <td style="padding:4px 8px; text-align:right;">HP delta</td>
+        <td style="padding:4px 8px; text-align:right;">Gold delta</td>
+        <td style="padding:4px 8px; text-align:right;">Pick share</td>
+        <td style="padding:4px 8px; text-align:right;">HP contrib.</td>
+        <td style="padding:4px 8px; text-align:right;">Gold contrib.</td>
+      </tr>
+      ${OUTCOMES.map(o=>{
+        let share = ev.counts[o.id]/ev.N;
+        let hpC = o.hpDelta * share;
+        let gC  = o.goldDelta * share;
+        return `<tr style="border-bottom:0.5px solid var(--color-border-tertiary);">
+          <td style="padding:4px 8px 4px 0;">${o.label}</td>
+          <td style="padding:4px 8px; text-align:right; color:${o.hpDelta<0?'#c04040':o.hpDelta>0?'#3ca870':'var(--color-text-secondary)'};">${o.hpDelta>=0?'+':''}${o.hpDelta}</td>
+          <td style="padding:4px 8px; text-align:right; color:${o.goldDelta>0?'#c9a84c':'var(--color-text-secondary)'};">${o.goldDelta>=0?'+':''}${o.goldDelta}</td>
+          <td style="padding:4px 8px; text-align:right;">${(share*100).toFixed(1)}%</td>
+          <td style="padding:4px 8px; text-align:right; color:${hpC<0?'#c04040':hpC>0?'#3ca870':'var(--color-text-secondary)'};">${hpC>=0?'+':''}${hpC.toFixed(2)}</td>
+          <td style="padding:4px 8px; text-align:right; color:${gC>0?'#c9a84c':'var(--color-text-secondary)'};">${gC>=0?'+':''}${gC.toFixed(2)}g</td>
+        </tr>`;
+      }).join('')}
+      <tr style="font-weight:500;">
+        <td style="padding:6px 8px 4px 0;">Total EV</td>
+        <td></td><td></td><td></td>
+        <td style="padding:6px 8px; text-align:right; color:${hpEV>=0?'#3ca870':'#c04040'};">${hpEV>=0?'+':''}${hpEV.toFixed(2)}</td>
+        <td style="padding:6px 8px; text-align:right; color:#c9a84c;">+${goldEV.toFixed(2)}g</td>
+      </tr>
+    </table>
+    <div style="margin-top:10px; font-size:11px; color:var(--color-text-secondary);">
+      Legend: <span style="display:inline-flex; align-items:center; gap:4px; margin-right:12px;"><span style="width:10px;height:10px;background:#3ca870;border-radius:2px;"></span> HP</span>
+      <span style="display:inline-flex; align-items:center; gap:4px;"><span style="width:10px;height:10px;background:#c9a84c;border-radius:2px;"></span> Gold</span>
+    </div>
+  `;
+}
+
+document.getElementById('startHp').oninput = function(){ document.getElementById('startHpOut').textContent = this.value; };
+document.getElementById('numDoors').oninput = function(){ document.getElementById('numDoorsOut').textContent = this.value; };
+
+
+
+runSim();
 
 setupStars();
 initRound();
