@@ -148,7 +148,7 @@ function render() {
       </div>
     </div>
     <div class="round-label">— Round ${state.round} —</div>
-    <a class="diogram-link" href="./diorama.html">Go to Diorama</a>
+    <a class="diogram-link" href="./diogram.html">Go to Diorama</a>
     <p class="scene-text">${sceneMsg}</p>
     <div class="doors-row">${doorsHTML}</div>
     <div class="log-area">${logHTML}</div>
@@ -391,12 +391,21 @@ function runSim() {
   `;
 }
 
-document.getElementById('startHp').oninput = function(){ document.getElementById('startHpOut').textContent = this.value; };
-document.getElementById('numDoors').oninput = function(){ document.getElementById('numDoorsOut').textContent = this.value; };
+const startHpEl = document.getElementById('startHp');
+const numDoorsEl = document.getElementById('numDoors');
+if(startHpEl){ startHpEl.oninput = function(){ const out = document.getElementById('startHpOut'); if(out) out.textContent = this.value; }; }
+if(numDoorsEl){ numDoorsEl.oninput = function(){ const out = document.getElementById('numDoorsOut'); if(out) out.textContent = this.value; }; }
 
-
-
-runSim();
+// If simulation controls are present, run the sim UI. Otherwise initialize the playable game.
+if(startHpEl && numDoorsEl){
+  runSim();
+} else {
+  // Initialize game view (doors, stars, etc.) for `game.html` page
+  initRound();
+  render();
+  // draw background stars if canvas exists
+  try { setupStars(); window.addEventListener('resize', setupStars); } catch(e) { /* ignore if canvas missing */ }
+}
 
 setupStars();
 initRound();
