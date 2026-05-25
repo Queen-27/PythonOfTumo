@@ -148,6 +148,7 @@ function render() {
       </div>
     </div>
     <div class="round-label">— Round ${state.round} —</div>
+    <a class="diogram-link" href="./diorama.html">Go to Diorama</a>
     <p class="scene-text">${sceneMsg}</p>
     <div class="doors-row">${doorsHTML}</div>
     <div class="log-area">${logHTML}</div>
