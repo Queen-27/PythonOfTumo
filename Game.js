@@ -30,7 +30,7 @@ function genDoors(numDoors) {
   });
 }
 
-let state = { hp:100, gold:0, round:1, phase:'choose', doors:[], log:[], chosen:null, result:null, alive:true, won:false };
+let state = { hp:100, gold:0, round:1, phase:'choose', doors:[], log:[], chosen:null, result:null, alive:true };
 
 function initRound() {
   let n = 2 + Math.min(state.round-1, 2);
@@ -54,15 +54,6 @@ function pickDoor(idx) {
   state.log.unshift(msg);
   if(state.log.length > 4) state.log.pop();
   if(state.hp <= 0) { state.alive = false; }
-  // Win condition: reach 1000 gold
-  if(state.gold >= 1000) {
-    state.won = true;
-    state.phase = 'won';
-    state.log.unshift(`🏆 Reached ${state.gold} Gold — You win!`);
-    if(state.log.length > 6) state.log.pop();
-    render();
-    return;
-  }
   render();
   if(state.alive) {
     setTimeout(()=>{ state.phase='next'; render(); }, 900);
@@ -76,7 +67,7 @@ function nextRound() {
 }
 
 function restart() {
-  state = { hp:100, gold:0, round:1, phase:'choose', doors:[], log:[], chosen:null, result:null, alive:true, won:false };
+  state = { hp:100, gold:0, round:1, phase:'choose', doors:[], log:[], chosen:null, result:null, alive:true };
   initRound();
   render();
 }
@@ -89,17 +80,6 @@ function hpColor(hp) {
 
 function render() {
   const root = document.getElementById('main-content');
-  if(state.won) {
-    root.innerHTML = `
-      <div class="gameover">
-        <h2>🏆 You Win!</h2>
-        <p>You've amassed enough fortune to escape the hallway.</p>
-        <span class="score-big">💰 ${state.gold} Gold</span>
-        <p style="font-size:13px;margin-bottom:6px;">Cleared <strong style="color:var(--gold-light)">${state.round}</strong> rounds</p>
-        <button class="btn-next" onclick="restart()">↩ Play Again</button>
-      </div>`;
-    return;
-  }
   if(!state.alive) {
     root.innerHTML = `
       <div class="gameover">
@@ -430,5 +410,3 @@ if(startHpEl && numDoorsEl){
 setupStars();
 initRound();
 render();
-
-
